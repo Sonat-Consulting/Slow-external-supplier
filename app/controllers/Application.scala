@@ -4,8 +4,17 @@ import play.api._
 import play.api.mvc._
 import play.api.libs.json.Json
 import java.util.concurrent.atomic.AtomicInteger
+import akka.actor.{Props, Actor}
+import scala.concurrent.duration.{FiniteDuration, Duration}
+import play.api.libs.concurrent.Akka
+import akka.pattern.ask
+import akka.util.Timeout
+import java.util.concurrent.TimeUnit
+import scala.util.Random
 
 object Application extends Controller {
+  import play.api.Play.current
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   val nextOrderId = new AtomicInteger(1000)
 
@@ -13,15 +22,62 @@ object Application extends Controller {
 
   implicit val jsonOrderReference = Json.format[OrderReference]
 
-  def placeOrder(itemId:String) = Action {
+  implicit val timeout = Timeout(60, TimeUnit.MINUTES)
 
-    val nextId = nextOrderId.getAndIncrement
-    val orderRef = OrderReference(""+nextId, itemId)
-    Logger.info(s"Placing order $orderRef")
+  val delayer = Akka.system.actorOf(Props[DelayActor])
 
-    val json = Json.toJson(orderRef)
+  val random = new Random()
 
-    Ok(json)
+
+  def shouldFail(errorRateInPercent:Option[Int]):Boolean = {
+    val value = random.nextInt(99)
+    val percent = errorRateInPercent.getOrElse(30)
+
+    return value < percent
   }
 
+  def getRandom(v:Int):Int = {
+    if ( v <= 0 ) {
+      v
+    } else {
+      random.nextInt(v)
+    }
+  }
+
+  def placeOrder(itemId:String, fixedDelayInMills:Option[Int], randomDelayInMills:Option[Int], errorRateInPercent:Option[Int]) = Action.async {
+
+    val randomDelay = getRandom(randomDelayInMills.getOrElse(1000))
+    val delay = Duration(fixedDelayInMills.getOrElse(1000) + randomDelay, TimeUnit.MILLISECONDS)
+    Logger.info(s"Going to Place order for $itemId in $delay")
+
+    ask(delayer, delay).map {
+      i =>
+
+        if (shouldFail(errorRateInPercent)) {
+          Logger.info(s"Decided to fail Placing order for $itemId")
+          new Status(SERVICE_UNAVAILABLE)
+        } else {
+          val nextId = nextOrderId.getAndIncrement
+          val orderRef = OrderReference(""+nextId, itemId)
+          Logger.info(s"Placing order $orderRef")
+
+          val json = Json.toJson(orderRef)
+
+          Ok(json)
+        }
+    }
+  }
+
+  class DelayActor extends Actor {
+
+    def receive = {
+      case d: Duration => {
+        val s = sender
+        context.system.scheduler.scheduleOnce(FiniteDuration(d.length, d.unit)){
+          s ! "done"
+        }
+      }
+    }
+
+  }
 }
