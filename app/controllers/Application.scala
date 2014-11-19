@@ -44,6 +44,45 @@ object Application extends Controller {
     }
   }
 
+  def getFruits(name:String, fixedDelayInMills:Option[Int], randomDelayInMills:Option[Int], errorRateInPercent:Option[Int]):Action[AnyContent] = {
+    getFruitsWithAmount(name, 1, fixedDelayInMills, randomDelayInMills, errorRateInPercent)
+  }
+
+  def translate(name:String):String = {
+    name.toLowerCase match {
+      case "orange" => "appelsin"
+      case x:String => x
+    }
+  }
+
+  def getFruitsWithAmount(name:String, amount:Int, fixedDelayInMills:Option[Int], randomDelayInMills:Option[Int], errorRateInPercent:Option[Int]) = Action.async {
+
+    val randomDelay = getRandom(randomDelayInMills.getOrElse(1000))
+    val delay = Duration(fixedDelayInMills.getOrElse(1000) + randomDelay, TimeUnit.MILLISECONDS)
+    Logger.info(s"Going to return fruits of $name in $delay")
+
+    ask(delayer, delay).map {
+      i =>
+
+        if (shouldFail(errorRateInPercent)) {
+          Logger.info(s"Decided to fail getting fruits of type $name")
+          new Status(SERVICE_UNAVAILABLE)
+        } else {
+
+          Logger.info(s"Returning fruits of type $name")
+
+          val norwegianName:String = translate(name)
+          Logger.info(s"norwegianName: $norwegianName")
+          val list = Range(0,amount).map( x => norwegianName).toList
+
+
+          val json = Json.toJson(list)
+
+          Ok(json)
+        }
+    }
+  }
+
   def placeOrder(itemId:String, fixedDelayInMills:Option[Int], randomDelayInMills:Option[Int], errorRateInPercent:Option[Int]) = Action.async {
 
     val randomDelay = getRandom(randomDelayInMills.getOrElse(1000))

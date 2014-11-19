@@ -3,8 +3,11 @@
 # ~~~~
 
 # Home page
-GET     /placeOrder                 controllers.Application.placeOrder(itemId,fixedDelayInMills:Option[Int], randomDelayInMills:Option[Int], errorRateInPercent:Option[Int])
-PUT     /placeOrder                 controllers.Application.placeOrder(itemId,fixedDelayInMills:Option[Int], randomDelayInMills:Option[Int], errorRateInPercent:Option[Int])
+GET        /placeOrder          controllers.Application.placeOrder(itemId,fixedDelayInMills:Option[Int], randomDelayInMills:Option[Int], errorRateInPercent:Option[Int])
+PUT        /placeOrder          controllers.Application.placeOrder(itemId,fixedDelayInMills:Option[Int], randomDelayInMills:Option[Int], errorRateInPercent:Option[Int])
+
+GET        /fruit/:name          controllers.Application.getFruits(name:String, fixedDelayInMills:Option[Int], randomDelayInMills:Option[Int], errorRateInPercent:Option[Int])
+GET        /fruit/:name/:amount  controllers.Application.getFruitsWithAmount(name:String, amount:Int,fixedDelayInMills:Option[Int], randomDelayInMills:Option[Int], errorRateInPercent:Option[Int])
 
 # Map static resources from the /public folder to the /assets URL path
-GET     /assets/*file               controllers.Assets.at(path="/public", file)
+GET        /assets/*file        controllers.Assets.at(path="/public", file)
